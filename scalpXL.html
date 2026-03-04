@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalkulator Scalping Pro</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; padding: 20px; color: #333; }
+        .container { max-width: 650px; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); margin: auto; }
+        h2 { text-align: center; color: #1a237e; border-bottom: 2px solid #e8eaf6; padding-bottom: 10px; }
+        .section-title { font-size: 18px; color: #3949ab; margin-top: 20px; margin-bottom: 10px; font-weight: bold; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #546e7a; font-size: 14px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #cfd8dc; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+        input:focus { outline: none; border-color: #3949ab; box-shadow: 0 0 5px rgba(57, 73, 171, 0.3); }
+        .info-box { background: #e3f2fd; padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 14px; color: #1565c0; border-left: 4px solid #1e88e5; }
+        .result-box { background: #f5f5f5; padding: 15px; border-radius: 6px; margin-top: 20px; border: 1px solid #e0e0e0; }
+        .result-item { font-size: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; border-bottom: 1px dashed #ccc; padding-bottom: 5px; }
+        .result-item:last-child { border-bottom: none; }
+        .profit { color: #2e7d32; font-weight: bold; font-size: 18px; }
+        .loss { color: #c62828; font-weight: bold; font-size: 18px; }
+        .warning { color: #d32f2f; font-weight: bold; font-size: 14px; margin-top: 5px; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Kalkulator Scalping Pro (Stockbit)</h2>
+    
+    <div class="section-title">1. Persiapan Dana</div>
+    <div class="form-group">
+        <label>Total Cash on Hand (RDN) - Rp:</label>
+        <input type="number" id="rdn" placeholder="Contoh: 500000">
+    </div>
+    <div class="form-group">
+        <label>Opsi Day Trade (Margin):</label>
+        <select id="margin">
+            <option value="1">x1 (Tanpa Margin)</option>
+            <option value="2">x2</option>
+            <option value="3">x3</option>
+            <option value="4" selected>x4</option>
+        </select>
+    </div>
+
+    <div class="info-box">
+        Buying Power Maksimal: <strong id="bp_max">Rp 0</strong><br>
+        Maksimal Beli Lot (Estimasi): <strong id="lot_max">0 Lot</strong>
+    </div>
+
+    <div class="section-title">2. Rencana Pembelian (Entry)</div>
+    <div class="form-group">
+        <label>Kode Saham (Manual):</label>
+        <input type="text" id="emiten" placeholder="Contoh: ADRO">
+    </div>
+    <div class="form-group">
+        <label>Harga Beli per Lembar - Rp:</label>
+        <input type="number" id="beli" placeholder="Contoh: 2400">
+    </div>
+    <div class="form-group">
+        <label>Jumlah Beli (LOT):</label>
+        <input type="number" id="lot" placeholder="Contoh: 8">
+        <div id="lot_warning" class="warning">⚠️ Buying Power tidak cukup untuk jumlah lot ini!</div>
+    </div>
+
+    <div class="section-title">3. Rencana Penjualan (Exit)</div>
+    <div class="form-group">
+        <label>Target Jual per Lembar - Rp:</label>
+        <input type="number" id="jual" placeholder="Contoh: 2420">
+    </div>
+
+    <div class="result-box">
+        <div class="result-item"><span>Total Modal Terpakai (+Fee Beli 0.15%):</span> <strong id="modal_terpakai">Rp 0</strong></div>
+        <div class="result-item"><span>Total Nilai Jual Bersih (-Fee Jual 0.25%):</span> <strong id="nilai_jual">Rp 0</strong></div>
+        <div class="result-item" style="margin-top: 10px; font-size: 16px;"><span>Net Profit / Loss:</span> <strong id="pnl">Rp 0</strong></div>
+    </div>
+</div>
+
+<script>
+    // Fungsi untuk mengubah angka jadi format Rupiah yang rapi
+    function formatRp(angka) {
+        return "Rp " + Math.round(angka).toLocaleString('id-ID');
+    }
+
+    // Fungsi utama kalkulasi
+    function hitungSemua() {
+        let rdn = parseFloat(document.getElementById('rdn').value) || 0;
+        let margin = parseFloat(document.getElementById('margin').value) || 1;
+        let hargaBeli = parseFloat(document.getElementById('beli').value) || 0;
+        let lotBeli = parseFloat(document.getElementById('lot').value) || 0;
+        let hargaJual = parseFloat(document.getElementById('jual').value) || 0;
+
+        let feeBeli = 1.0015; // +0.15% Stockbit
+        let feeJual = 0.9975; // -0.25% Stockbit
+
+        // 1. Hitung Kapasitas Maksimal (Buying Power)
+        let buyingPower = rdn * margin;
+        document.getElementById('bp_max').innerText = formatRp(buyingPower);
+
+        let maxLot = 0;
+        if (hargaBeli > 0) {
+            let modalPerLot = hargaBeli * 100 * feeBeli;
+            maxLot = Math.floor(buyingPower / modalPerLot);
+            document.getElementById('lot_max').innerText = maxLot.toLocaleString('id-ID') + " Lot";
+        } else {
+            document.getElementById('lot_max').innerText = "0 Lot";
+        }
+
+        // Warning jika input Lot melebihi maksimal kemampuan dana
+        if (lotBeli > maxLot && maxLot > 0) {
+            document.getElementById('lot_warning').style.display = "block";
+        } else {
+            document.getElementById('lot_warning').style.display = "none";
+        }
+
+        // 2. Kalkulasi Total Transaksi Beli
+        let totalModal = 0;
+        if (hargaBeli > 0 && lotBeli > 0) {
+            totalModal = lotBeli * 100 * hargaBeli * feeBeli;
+            document.getElementById('modal_terpakai').innerText = formatRp(totalModal);
+        } else {
+            document.getElementById('modal_terpakai').innerText = "Rp 0";
+        }
+
+        // 3. Kalkulasi Penjualan & Profit/Loss
+        if (hargaJual > 0 && lotBeli > 0 && hargaBeli > 0) {
+            let totalJual = lotBeli * 100 * hargaJual * feeJual;
+            document.getElementById('nilai_jual').innerText = formatRp(totalJual);
+            
+            let pnl = totalJual - totalModal;
+            let pnlElement = document.getElementById('pnl');
+            
+            if (pnl > 0) {
+                pnlElement.innerText = "+" + formatRp(pnl);
+                pnlElement.className = "profit";
+            } else if (pnl < 0) {
+                pnlElement.innerText = formatRp(pnl);
+                pnlElement.className = "loss";
+            } else {
+                pnlElement.innerText = "Rp 0";
+                pnlElement.className = "";
+                pnlElement.style.color = "#333";
+            }
+        } else {
+            document.getElementById('nilai_jual').innerText = "Rp 0";
+            let pnlElement = document.getElementById('pnl');
+            pnlElement.innerText = "Rp 0";
+            pnlElement.className = "";
+            pnlElement.style.color = "#333";
+        }
+    }
+
+    // Menghubungkan setiap kotak input dengan fungsi hitung agar otomatis!
+    document.getElementById('rdn').addEventListener('input', hitungSemua);
+    document.getElementById('margin').addEventListener('change', hitungSemua);
+    document.getElementById('beli').addEventListener('input', hitungSemua);
+    document.getElementById('lot').addEventListener('input', hitungSemua);
+    document.getElementById('jual').addEventListener('input', hitungSemua);
+
+    // Otomatis jalan saat halaman baru di-refresh jika ada angka yang tersimpan
+    window.addEventListener('load', hitungSemua);
+</script>
+</body>
+</html>
